@@ -12,7 +12,7 @@ api:
 
 ota:
   - platform: esphome
-    password: "3436aa100e357e144c92a4afdedd7847"
+    password: ""
 
 wifi:
   ssid: !secret wifi_ssid
@@ -21,7 +21,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Estores-Dormitorio"
-    password: "cjc9QBBWn6Ja"
+    password: ""
 
 captive_portal:
 
