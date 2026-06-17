@@ -1,0 +1,257 @@
+esphome:
+  name: estores-dormitorio
+  friendly_name: Estores del dormitorio
+  platform: ESP8266
+  board: d1_mini
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+  - platform: esphome
+    password: "3436aa100e357e144c92a4afdedd7847"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Estores-Dormitorio"
+    password: "cjc9QBBWn6Ja"
+
+captive_portal:
+
+# Configuración de los servos
+servo:
+  - id: servo_izquierdo
+    output: pwm_output_izq
+  - id: servo_derecho
+    output: pwm_output_der
+
+# On ESP32, use ledc output
+output:
+  - platform: esp8266_pwm
+    id: pwm_output_izq
+    pin: D1
+    frequency: 50 Hz
+    
+  - platform: esp8266_pwm
+    id: pwm_output_der
+    pin: D2
+    frequency: 50 Hz
+
+# 
+time:
+  - platform: homeassistant
+    timezone: Europe/Madrid
+    id: homeassistant_time
+
+sun:
+  latitude: 39.4848130724°
+  longitude: -0.3770796954°
+  on_sunset:
+    - elevation: -5°
+      then: 
+        if:
+          condition:
+            - not:
+                api.connected
+          then:
+            - cover.control:
+                id: estores
+                position: 50%
+    - elevation: 0°
+      then: 
+        if:
+          condition:
+            - not:
+                api.connected
+          then:
+            - cover.control:
+                id: estores
+                position: 0%
+
+# Sensores de posición
+binary_sensor:
+  - platform: gpio
+    id: sw_subir
+    pin:
+      number: TX
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      then:
+        - logger.log: "Pressed Up"
+        - cover.open: estores
+    on_click:
+      then:
+        - cover.control:
+            id: estores
+            position: 100%
+        - logger.log: "Clicked Up"
+    on_release:
+      then:
+        - cover.stop: estores
+        - logger.log: "Released Up"
+        
+        
+  - platform: gpio
+    id: sw_bajar
+    pin:
+      number: RX
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    on_press:
+      then:
+        - logger.log: "Pressed Down"
+        - cover.close: estores
+    on_click:
+      then:
+        - cover.control:
+            id: estores
+            position: 0%
+        - logger.log: "Clicked Down"
+    on_release:
+      then:
+        - cover.stop: estores
+        - logger.log: "Released Down"
+        
+  - platform: gpio
+    id: endstop_izq
+    pin:
+      number: D6
+      inverted: false
+  - platform: gpio
+    id: endstop_der
+    pin:
+      number: D7
+      inverted: false
+  - platform: template
+    id: endstop_both
+    lambda: 'return (id(endstop_der).state && id(endstop_izq).state);'
+  - platform: template
+    id: endstop_null
+    lambda: 'return false;'
+    
+#Entidad estores conjunta
+cover:
+  - platform: endstop
+    id: estores
+    name: "Estores del dormitorio"
+    device_class: blind
+    max_duration: 35s
+    open_action:
+      - cover.open: estor_izq
+      - cover.open: estor_der
+    open_duration: 30s
+    open_endstop: endstop_null
+
+    close_action:
+      - cover.close: estor_izq
+      - cover.close: estor_der
+    close_duration: 35s
+    close_endstop: endstop_both
+
+    stop_action:
+      - cover.stop: estor_izq
+      - cover.stop: estor_der
+          
+  #Estor izquierdo
+  - platform: endstop
+    id: estor_izq
+    device_class: blind
+    internal: true
+    max_duration: 31s
+    open_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: 39.0%
+    open_duration: 31s
+    open_endstop: endstop_null
+
+    close_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: -39.0%
+    close_duration: 32s
+    close_endstop: endstop_izq
+
+    stop_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: 0%
+
+  #Estor derecho
+  - platform: endstop
+    id: estor_der
+    device_class: blind
+    internal: true
+    max_duration: 31s
+    open_action:
+      - servo.write:
+          id: servo_derecho
+          level: 33.0%
+    open_duration: 35s
+    open_endstop: endstop_null
+
+    close_action:
+      - servo.write:
+          id: servo_derecho
+          level: -27.0%
+    close_duration: 32s
+    close_endstop: endstop_der
+
+    stop_action:
+      - servo.write:
+          id: servo_derecho
+          level: 0%
+
+switch:
+  - platform: template
+    id: ha_cierreAuto
+    name: "Cierre automático"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+  - platform: template
+    id: ha_subir
+    name: "Subir"
+    turn_on_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: 35.0%
+      - servo.write:
+          id: servo_derecho
+          level: 35.0%
+    turn_off_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: 0%
+      - servo.write:
+          id: servo_derecho
+          level: 0%
+  - platform: template
+    id: ha_bajar
+    name: "Bajar"
+    turn_on_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: -35.0%
+      - servo.write:
+          id: servo_derecho
+          level: -35.0%
+    turn_off_action:
+      - servo.write:
+          id: servo_izquierdo
+          level: 0%
+      - servo.write:
+          id: servo_derecho
+          level: 0%
